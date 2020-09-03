@@ -3,15 +3,39 @@ Created on 9/1/20
 
 @author: dulanj
 '''
+import os
+
 import cv2 as cv
 import numpy as np
+import glob
 
 
-class preprocessing():
-    def __init__(self):
-        pass
+class Preprocess():
+    def __init__(self, train_path, test_path):
+        self.train_path = train_path
+        self.test_path = test_path
 
-    def main(self, image):
+    def load_data(self):
+        X = []
+        y = []
+        for dir_path in glob.glob(self.train_path + '/*'):
+            plant_name = os.path.basename(dir_path)
+
+            print(plant_name)
+            for i, file_path in enumerate(glob.glob(dir_path + '/*')):
+                print(file_path)
+                img = cv.imread(file_path)
+                X.append(self.preprocess_image(img))
+                y.append(plant_name)
+                if i > 0:
+                    break
+
+        X = np.asarray(X)
+        y = np.asarray(y)
+
+        return X, y
+
+    def preprocess_image(self, image):
         # Use gaussian blur
         blurImg = cv.GaussianBlur(image, (5, 5), 0)
 
@@ -33,7 +57,7 @@ class preprocessing():
         clear[bMask] = image[bMask]  # Apply boolean mask to the origin image
         return clear
 
-
-if __name__ == "__main__":
-    obj = preprocessing()
-    obj.main()
+#
+# if __name__ == "__main__":
+#     obj = preprocessing()
+#     obj.main()

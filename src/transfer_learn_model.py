@@ -4,8 +4,6 @@ Created on 9/1/20
 @author: dulanj
 '''
 import tensorflow as tf
-import keras.layers as all_layers
-
 from src.model import Model
 
 
