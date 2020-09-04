@@ -3,15 +3,15 @@ Created on 9/1/20
 
 @author: dulanj
 '''
+import glob
 import os
 
 import cv2 as cv
 import numpy as np
-import glob
 
 
 class Preprocess():
-    input_shape = (70, 70)
+    input_shape = (120, 120)
 
     def __init__(self, train_path, test_path):
         self.train_path = train_path
@@ -37,22 +37,17 @@ class Preprocess():
 
         return X, y
 
-    # def generate_data(directory, batch_size):
-    #     """Replaces Keras' native ImageDataGenerator."""
-    #     i = 0
-    #     file_list = os.listdir(directory)
-    #     while True:
-    #         image_batch = []
-    #         for b in range(batch_size):
-    #             if i == len(file_list):
-    #                 i = 0
-    #                 random.shuffle(file_list)
-    #             sample = file_list[i]
-    #             i += 1
-    #             image = cv2.resize(cv2.imread(sample[0]), INPUT_SHAPE)
-    #             image_batch.append((image.astype(float) - 128) / 128)
-    #
-    #         yield np.array(image_batch)
+    def load_test_data(self):
+        X = []
+        ids = []
+        for i, file_path in enumerate(glob.glob(self.test_path + '/*')):
+            print(file_path)
+            img = cv.imread(file_path)
+            X.append(self.preprocess_image(img))
+            ids.append(os.path.basename(file_path))
+        X = np.asarray(X)
+
+        return X, ids
 
     def preprocess_image(self, image):
         image = cv.resize(image, Preprocess.input_shape)

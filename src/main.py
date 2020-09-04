@@ -3,45 +3,47 @@ Created on 9/1/20
 
 @author: dulanj
 '''
+import numpy as np
+import pandas as pd
+import tensorflow as tf
 from keras.utils import np_utils
 from keras_preprocessing.image import ImageDataGenerator
-from sklearn.model_selection import train_test_split
-
-from src.mymodel import MyModel
-import tensorflow as tf
 from sklearn import preprocessing
+
+from src.common import *
 from src.preprocessing import Preprocess
 from src.transfer_learn_model import TransferLearnModel
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
-# tf.config.experimental.set_per_process_memory_fraction(0.75)
-# tf.config.set_per_process_memory_growth(True)
 # config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
-tf.config.experimental.set_virtual_device_configuration(physical_devices[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=2500)])
-# config = tf.config.experimental.g
+tf.config.experimental.set_virtual_device_configuration(physical_devices[0], [
+    tf.config.experimental.VirtualDeviceConfiguration(memory_limit=2500)])
 
 
 class Main():
     def __init__(self):
-        pass
+        self.label_encoder = preprocessing.LabelEncoder()
+        self.label_encoder.fit(list_of_plants)
 
-    def resnet50(self):
-        model = tf.keras.applications.ResNet50(include_top=True, weights='imagenet', input_shape=(224, 224, 3))
-        print(model.summary())
+        self.train_path = '/home/dulanj/Projects/Kaggle/Plant-Seed/plant-seedlings-classification/train'
+        self.test_path = '/home/dulanj/Projects/Kaggle/Plant-Seed/plant-seedlings-classification/test'
+        self.pre_pro = Preprocess(self.train_path, self.test_path)
+
+    def get_model(self):
+        return TransferLearnModel.get_model(verbose=1)
+
+    def create_dir_if_not(self, dir_name):
+        import os
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
 
     def main(self):
-        train_path = '/home/dulanj/Projects/Kaggle/Plant-Seed/plant-seedlings-classification/train'
-        test_path = '/home/dulanj/Projects/Kaggle/Plant-Seed/plant-seedlings-classification/test'
-        pre_pro = Preprocess(train_path, test_path)
-        X, y = pre_pro.load_data()
+        X, y = self.pre_pro.load_data()
 
         # Encode labels and create classes
-        print(y)
-        le = preprocessing.LabelEncoder()
-        le.fit(y)
-        print("Classes: " + str(le.classes_))
-        encodeTrainLabels = le.transform(y)
+        print("Classes: " + str(self.label_encoder.classes_))
+        encodeTrainLabels = self.label_encoder.transform(y)
 
         # Make labels categorical
         TrainLabel = np_utils.to_categorical(encodeTrainLabels)
@@ -57,11 +59,12 @@ class Main():
             # print("Train Index: ", train_index, "\n")
             # print("Test Index: ", test_index)
             print("K FOLD : {}".format(k_fold_count))
-            trainX, testX, trainY, testY = X[train_index], X[test_index], TrainLabel[train_index], TrainLabel[test_index]
+            trainX, testX, trainY, testY = X[train_index], X[test_index], TrainLabel[train_index], TrainLabel[
+                test_index]
 
-        # trainX, testX, trainY, testY = train_test_split(X, TrainLabel,
-        #                                                 test_size=0.3, random_state=1,
-        #                                                 stratify=TrainLabel)
+            # trainX, testX, trainY, testY = train_test_split(X, TrainLabel,
+            #                                                 test_size=0.3, random_state=1,
+            #                                                 stratify=TrainLabel)
 
             datagen = ImageDataGenerator(
                 rotation_range=180,  # randomly rotate images in the range
@@ -73,18 +76,67 @@ class Main():
             )
             datagen.fit(trainX)
 
-            model = TransferLearnModel.get_model(verbose=0)
+            model = self.get_model()
 
             epochs = 5
             print("Train shape {} Test shape {}".format(trainY.shape, trainX.shape))
             batch_size = 5
             steps_per_epo = len(trainX) / batch_size
             print("Epoch {} Batch size {} Steps per epoch {}".format(epochs, batch_size, steps_per_epo))
-            model.fit(datagen.flow(trainX, trainY, batch_size=batch_size), steps_per_epoch=steps_per_epo, epochs=epochs)
+
+            # from tf.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, CSVLogger
+            from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+
+            # learning rate reduction
+            learning_rate_reduction = ReduceLROnPlateau(monitor='val_accuracy',
+                                                        patience=3,
+                                                        verbose=1,
+                                                        factor=0.4,
+                                                        min_lr=0.00001)
+
+            # checkpoints
+            self.create_dir_if_not('output')
+            filepath = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-acc{accuracy:.2f}.hdf5"
+            filepath2 = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-val{accuracy:.2f}.hdf5"
+
+            checkpoint = ModelCheckpoint(filepath, monitor='accuracy',
+                                         verbose=1, save_best_only=True, mode='max')
+            filepath = "output/weights.last_auto4.hdf5"
+            checkpoint_all = ModelCheckpoint(filepath2, monitor='val_accuracy',
+                                             verbose=1, save_best_only=True, mode='max')
+
+            # all callbacks
+            callbacks_list = [checkpoint, learning_rate_reduction, checkpoint_all]
+
+            model.fit(datagen.flow(trainX, trainY, batch_size=batch_size), steps_per_epoch=steps_per_epo,
+                      epochs=epochs, validation_data=(testX, testY), callbacks=callbacks_list)
             tf.keras.backend.clear_session()
 
+    def test(self, best_model_path):
+        X, ids = self.pre_pro.load_test_data()
+        model = self.get_model()
+        model.load_weights(best_model_path)
+
+        pred = model.predict(X)
+
+        # Write result to file
+        predNum = np.argmax(pred, axis=1)
+        predStr = self.label_encoder.classes_[predNum]
+
+        res = {'file': ids, 'species': predStr}
+        df = pd.DataFrame(res)
+
+        from datetime import datetime
+        now = datetime.now()
+        self.create_dir_if_not('result')
+        df.to_csv("result/result_{}.csv".format(now.strftime("%Y-%m-%dT%H:%M")), index=False)
 
 
 if __name__ == "__main__":
+    TEST = True
     obj = Main()
-    obj.main()
+    if not TEST:
+        obj.main()
+    else:
+        best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output/weights_best_fold-2_05-acc0.32.hdf5"
+        obj.test(best_model_path)
