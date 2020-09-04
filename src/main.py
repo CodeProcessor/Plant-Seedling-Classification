@@ -26,8 +26,8 @@ class Main():
         self.label_encoder = preprocessing.LabelEncoder()
         self.label_encoder.fit(list_of_plants)
 
-        self.train_path = '/home/dulanj/Projects/Kaggle/Plant-Seed/plant-seedlings-classification/train'
-        self.test_path = '/home/dulanj/Projects/Kaggle/Plant-Seed/plant-seedlings-classification/test'
+        self.train_path = '/Assignment_NN/Plant-Seeding-Classification/train'
+        self.test_path = '/Assignment_NN/Plant-Seeding-Classification//test'
         self.pre_pro = Preprocess(self.train_path, self.test_path)
 
     def get_model(self):
@@ -138,5 +138,5 @@ if __name__ == "__main__":
     if not TEST:
         obj.main()
     else:
-        best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output/weights_best_fold-2_05-acc0.32.hdf5"
+        best_model_path = "/Assignment_NN/Plant-Seeding-Classification/src/output"
         obj.test(best_model_path)
