@@ -44,34 +44,44 @@ class Main():
         encodeTrainLabels = le.transform(y)
 
         # Make labels categorical
-        clearTrainLabel = np_utils.to_categorical(encodeTrainLabels)
-        num_clases = clearTrainLabel.shape[1]
+        TrainLabel = np_utils.to_categorical(encodeTrainLabels)
+        num_clases = TrainLabel.shape[1]
         print("Number of classes: " + str(num_clases))
-        print(clearTrainLabel)
+        print(TrainLabel)
 
-        trainX, testX, trainY, testY = train_test_split(X, clearTrainLabel,
-                                                        test_size=0.3, random_state=1,
-                                                        stratify=clearTrainLabel)
+        from sklearn.model_selection import KFold
+        cv = KFold(n_splits=5, random_state=42, shuffle=False)
+        k_fold_count = 0
+        for train_index, test_index in cv.split(X):
+            k_fold_count += 1
+            # print("Train Index: ", train_index, "\n")
+            # print("Test Index: ", test_index)
+            print("K FOLD : {}".format(k_fold_count))
+            trainX, testX, trainY, testY = X[train_index], X[test_index], TrainLabel[train_index], TrainLabel[test_index]
 
+        # trainX, testX, trainY, testY = train_test_split(X, TrainLabel,
+        #                                                 test_size=0.3, random_state=1,
+        #                                                 stratify=TrainLabel)
 
-        datagen = ImageDataGenerator(
-            rotation_range=180,  # randomly rotate images in the range
-            zoom_range=0.1,  # Randomly zoom image
-            width_shift_range=0.1,  # randomly shift images horizontally
-            height_shift_range=0.1,  # randomly shift images vertically
-            horizontal_flip=True,  # randomly flip images horizontally
-            vertical_flip=True  # randomly flip images vertically
-        )
-        datagen.fit(trainX)
+            datagen = ImageDataGenerator(
+                rotation_range=180,  # randomly rotate images in the range
+                zoom_range=0.1,  # Randomly zoom image
+                width_shift_range=0.1,  # randomly shift images horizontally
+                height_shift_range=0.1,  # randomly shift images vertically
+                horizontal_flip=True,  # randomly flip images horizontally
+                vertical_flip=True  # randomly flip images vertically
+            )
+            datagen.fit(trainX)
 
-        model = TransferLearnModel.get_model(verbose=0)
+            model = TransferLearnModel.get_model(verbose=0)
 
-        epochs = 5
-        print(trainY.shape)
-        print(trainX.shape)
-        batch_size = 5
-        model.fit(datagen.flow(trainX, trainY, batch_size=batch_size),
-                  steps_per_epoch=len(trainX) / batch_size, epochs=epochs)
+            epochs = 5
+            print("Train shape {} Test shape {}".format(trainY.shape, trainX.shape))
+            batch_size = 5
+            steps_per_epo = len(trainX) / batch_size
+            print("Epoch {} Batch size {} Steps per epoch {}".format(epochs, batch_size, steps_per_epo))
+            model.fit(datagen.flow(trainX, trainY, batch_size=batch_size), steps_per_epoch=steps_per_epo, epochs=epochs)
+            tf.keras.backend.clear_session()
 
 
 

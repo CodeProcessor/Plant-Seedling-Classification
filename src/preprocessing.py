@@ -29,8 +29,8 @@ class Preprocess():
                 img = cv.imread(file_path)
                 X.append(self.preprocess_image(img))
                 y.append(plant_name)
-                # if i > 50:
-                #     break
+                if i > 10:
+                    break
 
         X = np.asarray(X)
         y = np.array(y)
