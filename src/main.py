@@ -18,7 +18,7 @@ physical_devices = tf.config.experimental.list_physical_devices('GPU')
 assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
 # config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
 tf.config.experimental.set_virtual_device_configuration(physical_devices[0], [
-    tf.config.experimental.VirtualDeviceConfiguration(memory_limit=2500)])
+    tf.config.experimental.VirtualDeviceConfiguration(memory_limit=2000)])
 
 
 class Main():
@@ -78,9 +78,9 @@ class Main():
 
             model = self.get_model()
 
-            epochs = 5
+            epochs = 50
             print("Train shape {} Test shape {}".format(trainY.shape, trainX.shape))
-            batch_size = 5
+            batch_size = 4
             steps_per_epo = len(trainX) / batch_size
             print("Epoch {} Batch size {} Steps per epoch {}".format(epochs, batch_size, steps_per_epo))
 
@@ -97,7 +97,7 @@ class Main():
             # checkpoints
             self.create_dir_if_not('output')
             filepath = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-acc{accuracy:.2f}.hdf5"
-            filepath2 = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-val{accuracy:.2f}.hdf5"
+            filepath2 = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-val{val_accuracy:.2f}.hdf5"
 
             checkpoint = ModelCheckpoint(filepath, monitor='accuracy',
                                          verbose=1, save_best_only=True, mode='max')
@@ -111,6 +111,7 @@ class Main():
             model.fit(datagen.flow(trainX, trainY, batch_size=batch_size), steps_per_epoch=steps_per_epo,
                       epochs=epochs, validation_data=(testX, testY), callbacks=callbacks_list)
             tf.keras.backend.clear_session()
+            break
 
     def test(self, best_model_path):
         X, ids = self.pre_pro.load_test_data()
@@ -129,7 +130,9 @@ class Main():
         from datetime import datetime
         now = datetime.now()
         self.create_dir_if_not('result')
-        df.to_csv("result/result_{}.csv".format(now.strftime("%Y-%m-%dT%H:%M")), index=False)
+        output_filename = "result/result_{}.csv".format(now.strftime("%Y-%m-%dT%H:%M"))
+        df.to_csv(output_filename, index=False)
+        print("Results saved to {}".format(output_filename))
 
 
 if __name__ == "__main__":
@@ -138,5 +141,5 @@ if __name__ == "__main__":
     if not TEST:
         obj.main()
     else:
-        best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output/weights_best_fold-2_05-acc0.32.hdf5"
+        best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output/weights_best_fold-1_46-acc0.95.hdf5"
         obj.test(best_model_path)

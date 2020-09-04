@@ -18,6 +18,8 @@ class TransferLearnModel(Model):
         input_layer = model.inputs
         x = model.layers[-1].output
         x = tf.keras.layers.GlobalAveragePooling2D()(x)
+        x = tf.keras.layers.Dense(32, activation='softmax')(x)
+        x = tf.keras.layers.Dropout(0.3)(x)
         x = tf.keras.layers.Dense(12, activation='softmax')(x)
         model = tf.keras.Model(input_layer, x)
         if verbose == 1:

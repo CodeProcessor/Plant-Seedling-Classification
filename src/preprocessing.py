@@ -29,8 +29,6 @@ class Preprocess():
                 img = cv.imread(file_path)
                 X.append(self.preprocess_image(img))
                 y.append(plant_name)
-                if i > 10:
-                    break
 
         X = np.asarray(X)
         y = np.array(y)
@@ -70,7 +68,8 @@ class Preprocess():
         # Apply the mask
         clear = np.zeros_like(image, np.uint8)  # Create empty image
         clear[bMask] = image[bMask]  # Apply boolean mask to the origin image
-        return clear
+        normalized_image = clear / 255
+        return normalized_image
 
 #
 # if __name__ == "__main__":
