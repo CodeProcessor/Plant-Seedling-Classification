@@ -10,6 +10,7 @@ from keras.utils import np_utils
 from keras_preprocessing.image import ImageDataGenerator
 from sklearn import preprocessing
 from mymodel import MyModel
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
 
 from src.common import *
@@ -54,67 +55,91 @@ class Main():
         print("Number of classes: " + str(num_clases))
         print(TrainLabel)
 
-        # from sklearn.model_selection import KFold
-        # cv = KFold(n_splits=5, random_state=42, shuffle=False)
+        from sklearn.model_selection import KFold
+        cv = KFold(n_splits=5, random_state=42, shuffle=False)
         k_fold_count = 0
-        # for train_index, test_index in cv.split(X):
-        #     k_fold_count += 1
-        #     # print("Train Index: ", train_index, "\n")
-        #     # print("Test Index: ", test_index)
-        #     print("K FOLD : {}".format(k_fold_count))
-        #     trainX, testX, trainY, testY = X[train_index], X[test_index], TrainLabel[train_index], TrainLabel[
-        #         test_index]
-        #
-        trainX, testX, trainY, testY = train_test_split(X, TrainLabel,
-                                                        test_size=0.2, random_state=1,
-                                                        stratify=TrainLabel)
+        for train_index, test_index in cv.split(X):
+            k_fold_count += 1
+            print("K FOLD : {}".format(k_fold_count))
+            trainX, testX, trainY, testY = X[train_index], X[test_index], TrainLabel[train_index], TrainLabel[
+                test_index]
 
-        datagen = ImageDataGenerator(
-            rotation_range=180,  # randomly rotate images in the range
-            zoom_range=0.1,  # Randomly zoom image
-            width_shift_range=0.1,  # randomly shift images horizontally
-            height_shift_range=0.1,  # randomly shift images vertically
-            horizontal_flip=True,  # randomly flip images horizontally
-            vertical_flip=True  # randomly flip images vertically
-        )
-        datagen.fit(trainX)
 
-        model = self.get_model()
+        # trainX, testX, trainY, testY = train_test_split(X, TrainLabel,
+        #                                                 test_size=0.2, random_state=1,
+        #                                                 stratify=TrainLabel)
 
-        epochs = 50
-        print("Train shape {} Test shape {}".format(trainY.shape, trainX.shape))
-        batch_size = 4
-        steps_per_epo = len(trainX) / batch_size
-        print("Epoch {} Batch size {} Steps per epoch {}".format(epochs, batch_size, steps_per_epo))
+            datagen = ImageDataGenerator(
+                zoom_range=0.2,                 # This will randomly zoom the image
+                brightness_range=[0.7, 1.3],    # Randomly change the brightness
+                horizontal_flip=True,           # This will randomly flip - horizontally
+                vertical_flip=True,             # This will randomly flip - vertically
+                rotation_range=180,             # Randomly rotate images 0 to 180
+                width_shift_range=0.15,          # Randomly shift the images - horizontally
+                height_shift_range=0.15          # Randomly shift the images - vertically
+            )
+            datagen.fit(trainX)
 
-        # from tf.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, CSVLogger
-        from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+            model = self.get_model()
 
-        # learning rate reduction
-        learning_rate_reduction = ReduceLROnPlateau(monitor='val_accuracy',
-                                                    patience=3,
-                                                    verbose=1,
-                                                    factor=0.4,
-                                                    min_lr=0.00001)
+            epochs = 50
+            print("Train shape {} Test shape {}".format(trainY.shape, trainX.shape))
+            batch_size = 4
+            steps_per_epo = len(trainX) / batch_size
+            print("Epoch {} Batch size {} Steps per epoch {}".format(epochs, batch_size, steps_per_epo))
 
-        # checkpoints
-        self.create_dir_if_not('output')
-        filepath = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-acc{accuracy:.2f}.hdf5"
-        filepath2 = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-val{val_accuracy:.2f}.hdf5"
+            # from tf.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, CSVLogger
+            from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
-        checkpoint = ModelCheckpoint(filepath, monitor='accuracy',
-                                     verbose=1, save_best_only=True, mode='max')
-        filepath = "output/weights.last_auto4.hdf5"
-        checkpoint_all = ModelCheckpoint(filepath2, monitor='val_accuracy',
+            # learning rate reduction parameters
+            learning_rate_reduction = ReduceLROnPlateau(monitor='val_accuracy',
+                                                        patience=4, verbose=1,
+                                                        factor=0.5, min_lr=0.00001)
+
+            # checkpoints
+            self.create_dir_if_not('output')
+            filepath = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-acc{accuracy:.2f}.hdf5"
+
+
+            checkpoint = ModelCheckpoint(filepath, monitor='accuracy',
                                          verbose=1, save_best_only=True, mode='max')
 
-        # all callbacks
-        callbacks_list = [learning_rate_reduction, checkpoint_all]
+            filepath = "output/weights.last_auto4.hdf5"
 
-        model.fit(datagen.flow(trainX, trainY, batch_size=batch_size), steps_per_epoch=steps_per_epo,
-                  epochs=epochs, validation_data=(testX, testY), callbacks=callbacks_list)
-        tf.keras.backend.clear_session()
 
+            filepath2 = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-val{val_accuracy:.2f}.hdf5"
+            checkpoint_all = ModelCheckpoint(filepath2, monitor='val_accuracy',
+                                             verbose=1, save_best_only=True, mode='max')
+
+            # all callbacks
+            callbacks_list = [learning_rate_reduction, checkpoint_all]
+
+            model.fit(datagen.flow(trainX, trainY, batch_size=batch_size), steps_per_epoch=steps_per_epo,
+                      epochs=epochs, validation_data=(testX, testY), callbacks=callbacks_list)
+            tf.keras.backend.clear_session()
+
+    def get_confusion_matrix(self, best_model_path):
+        # Load data
+        X, y = self.pre_pro.load_data()
+
+        # Encode labels
+        encode_labels = self.label_encoder.transform(y)
+
+        # Make labels categorical
+        categorical_labels = np_utils.to_categorical(encode_labels)
+
+        # Load model
+        model = self.get_model()
+        model.load_weights(best_model_path)
+
+        # PREDICTIONS
+        y_predictions = model.predict(X)
+        y_class = np.argmax(y_predictions, axis=1)
+        y_check = np.argmax(categorical_labels, axis=1)
+
+        # Confusion matrix
+        conf_matrix = confusion_matrix(y_check, y_class)
+        print(conf_matrix)
 
     def test(self, best_model_path):
         X, ids = self.pre_pro.load_test_data()
@@ -139,10 +164,13 @@ class Main():
 
 
 if __name__ == "__main__":
-    TEST = True
+    TEST = False
     obj = Main()
-    if not TEST:
-        obj.main()
-    else:
-        best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output/weights_best_fold-0_45-val0.75.hdf5"
-        obj.test(best_model_path)
+    best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output-mymodel/weights_best_fold-0_45-val0.75.hdf5"
+    obj.get_confusion_matrix(best_model_path)
+
+    # if not TEST:
+    #     obj.main()
+    # else:
+    #     best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output/weights_best_fold-0_45-val0.75.hdf5"
+    #     obj.test(best_model_path)

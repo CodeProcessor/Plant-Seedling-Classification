@@ -8,10 +8,11 @@ import os
 
 import cv2 as cv
 import numpy as np
+from src.common import input_shape
 
 
 class Preprocess():
-    input_shape = (80, 80)
+    input_shape = (input_shape[0], input_shape[1])
 
     def __init__(self, train_path, test_path):
         self.train_path = train_path
@@ -29,8 +30,8 @@ class Preprocess():
                 img = cv.imread(file_path)
                 X.append(self.preprocess_image(img))
                 y.append(plant_name)
-                # if i > 20:
-                #     break
+                if i > 100:
+                    break
 
         X = np.asarray(X)
         y = np.array(y)
@@ -50,27 +51,36 @@ class Preprocess():
         return X, ids
 
     def preprocess_image(self, image):
+        """
+        This method will do the pre-processing for a given image
+
+        """
+        # Resize the image
         image = cv.resize(image, Preprocess.input_shape)
-        # Use gaussian blur
-        blurImg = cv.GaussianBlur(image, (5, 5), 0)
+
+        # Use Gaussian blur
+        blurred_image = cv.GaussianBlur(image, (5, 5), 0)
 
         # Convert to HSV image
-        hsvImg = cv.cvtColor(blurImg, cv.COLOR_BGR2HSV)
+        HSV_image = cv.cvtColor(blurred_image, cv.COLOR_BGR2HSV)
 
-        # Create mask (parameters - green color range)
+        # Create the mask based on the green values
         lower_green = (25, 40, 50)
         upper_green = (75, 255, 255)
-        mask = cv.inRange(hsvImg, lower_green, upper_green)
+        mask = cv.inRange(HSV_image, lower_green, upper_green)
         kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (11, 11))
         mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
 
         # Create bool mask
-        bMask = mask > 0
+        binary_mask = mask > 0
 
         # Apply the mask
         clear = np.zeros_like(image, np.uint8)  # Create empty image
-        clear[bMask] = image[bMask]  # Apply boolean mask to the origin image
+        clear[binary_mask] = image[binary_mask]  # Apply boolean mask to the origin image
+
+        # Normalize pixel values
         normalized_image = clear / 255
+
         return normalized_image
 
 #

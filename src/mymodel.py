@@ -60,10 +60,11 @@ class MyModel(Model):
 
         model.add(Dense(12, activation='softmax'))
 
-        model.summary()
+        # Set Optimizer
+        opt = tf.keras.optimizers.Adam(lr=0.001, momentum=0.9)
 
         # compile model
-        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
         if verbose == 1:
             print(model.summary())
