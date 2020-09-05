@@ -11,7 +11,7 @@ import numpy as np
 
 
 class Preprocess():
-    input_shape = (120, 120)
+    input_shape = (80, 80)
 
     def __init__(self, train_path, test_path):
         self.train_path = train_path
@@ -29,6 +29,8 @@ class Preprocess():
                 img = cv.imread(file_path)
                 X.append(self.preprocess_image(img))
                 y.append(plant_name)
+                # if i > 20:
+                #     break
 
         X = np.asarray(X)
         y = np.array(y)

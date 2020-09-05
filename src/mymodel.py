@@ -1,9 +1,20 @@
 '''
-Created on 9/1/20
+Created on 9/5/20
 
-@author: dulanj
+@author: prislk
 '''
 import tensorflow as tf
+from keras.utils import np_utils
+from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import BatchNormalization
+from keras.callbacks import ModelCheckpoint,ReduceLROnPlateau,CSVLogger
+
 
 from src.model import Model
 
@@ -14,27 +25,52 @@ class MyModel(Model):
 
     @staticmethod
     def get_model(verbose=1):
-        inputs = tf.keras.Input(shape=(120, 120, 1))
-        x = tf.keras.layers.Conv2D(64, (3, 3), activation=tf.nn.relu)(inputs)
-        x = tf.keras.layers.MaxPool2D((2, 2))(x)
-        x = tf.keras.layers.Conv2D(128, (3, 3), activation=tf.nn.relu)(x)
-        x = tf.keras.layers.MaxPool2D((2, 2))(x)
-        x = tf.keras.layers.Conv2D(160, (3, 3), activation=tf.nn.relu)(x)
-        x = tf.keras.layers.MaxPool2D((2, 2))(x)
-        x = tf.keras.layers.Conv2D(256, (3, 3), activation=tf.nn.relu)(x)
-        x = tf.keras.layers.MaxPool2D((2, 2))(x)
-        x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(64, activation=tf.nn.relu)(x)
-        x = tf.keras.layers.Dense(16, activation=tf.nn.relu)(x)
-        outputs = tf.keras.layers.Dense(10, activation=tf.nn.sigmoid)(x)
-        model = tf.keras.Model(inputs=inputs, outputs=outputs)
+        model = Sequential()
+
+        model.add(Conv2D(filters=64, kernel_size=(5, 5), input_shape=(80, 80, 3), activation='relu'))
+        model.add(BatchNormalization(axis=3))
+        model.add(Conv2D(filters=64, kernel_size=(5, 5), activation='relu'))
+        model.add(MaxPooling2D((2, 2)))
+        model.add(BatchNormalization(axis=3))
+        model.add(Dropout(0.1))
+
+        model.add(Conv2D(filters=128, kernel_size=(5, 5), activation='relu'))
+        model.add(BatchNormalization(axis=3))
+        model.add(Conv2D(filters=128, kernel_size=(5, 5), activation='relu'))
+        model.add(MaxPooling2D((2, 2)))
+        model.add(BatchNormalization(axis=3))
+        model.add(Dropout(0.1))
+
+        model.add(Conv2D(filters=256, kernel_size=(5, 5), activation='relu'))
+        model.add(BatchNormalization(axis=3))
+        model.add(Conv2D(filters=256, kernel_size=(5, 5), activation='relu'))
+        model.add(MaxPooling2D((2, 2)))
+        model.add(BatchNormalization(axis=3))
+        model.add(Dropout(0.1))
+
+        model.add(Flatten())
+
+        model.add(Dense(256, activation='relu'))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.5))
+
+        model.add(Dense(256, activation='relu'))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.5))
+
+        model.add(Dense(12, activation='softmax'))
+
+        model.summary()
+
         # compile model
-        opt = tf.keras.optimizers.SGD(lr=0.01, momentum=0.9, decay=0.0001)
-        model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
         if verbose == 1:
             print(model.summary())
-
         return model
+
+
+
 
 
 if __name__ == "__main__":

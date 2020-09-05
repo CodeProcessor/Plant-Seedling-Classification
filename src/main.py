@@ -9,6 +9,8 @@ import tensorflow as tf
 from keras.utils import np_utils
 from keras_preprocessing.image import ImageDataGenerator
 from sklearn import preprocessing
+from mymodel import MyModel
+from sklearn.model_selection import train_test_split
 
 from src.common import *
 from src.preprocessing import Preprocess
@@ -31,7 +33,8 @@ class Main():
         self.pre_pro = Preprocess(self.train_path, self.test_path)
 
     def get_model(self):
-        return TransferLearnModel.get_model(verbose=1)
+        # return TransferLearnModel.get_model(verbose=1)
+        return MyModel.get_model(verbose=1)
 
     def create_dir_if_not(self, dir_name):
         import os
@@ -51,67 +54,67 @@ class Main():
         print("Number of classes: " + str(num_clases))
         print(TrainLabel)
 
-        from sklearn.model_selection import KFold
-        cv = KFold(n_splits=5, random_state=42, shuffle=False)
+        # from sklearn.model_selection import KFold
+        # cv = KFold(n_splits=5, random_state=42, shuffle=False)
         k_fold_count = 0
-        for train_index, test_index in cv.split(X):
-            k_fold_count += 1
-            # print("Train Index: ", train_index, "\n")
-            # print("Test Index: ", test_index)
-            print("K FOLD : {}".format(k_fold_count))
-            trainX, testX, trainY, testY = X[train_index], X[test_index], TrainLabel[train_index], TrainLabel[
-                test_index]
+        # for train_index, test_index in cv.split(X):
+        #     k_fold_count += 1
+        #     # print("Train Index: ", train_index, "\n")
+        #     # print("Test Index: ", test_index)
+        #     print("K FOLD : {}".format(k_fold_count))
+        #     trainX, testX, trainY, testY = X[train_index], X[test_index], TrainLabel[train_index], TrainLabel[
+        #         test_index]
+        #
+        trainX, testX, trainY, testY = train_test_split(X, TrainLabel,
+                                                        test_size=0.2, random_state=1,
+                                                        stratify=TrainLabel)
 
-            # trainX, testX, trainY, testY = train_test_split(X, TrainLabel,
-            #                                                 test_size=0.3, random_state=1,
-            #                                                 stratify=TrainLabel)
+        datagen = ImageDataGenerator(
+            rotation_range=180,  # randomly rotate images in the range
+            zoom_range=0.1,  # Randomly zoom image
+            width_shift_range=0.1,  # randomly shift images horizontally
+            height_shift_range=0.1,  # randomly shift images vertically
+            horizontal_flip=True,  # randomly flip images horizontally
+            vertical_flip=True  # randomly flip images vertically
+        )
+        datagen.fit(trainX)
 
-            datagen = ImageDataGenerator(
-                rotation_range=180,  # randomly rotate images in the range
-                zoom_range=0.1,  # Randomly zoom image
-                width_shift_range=0.1,  # randomly shift images horizontally
-                height_shift_range=0.1,  # randomly shift images vertically
-                horizontal_flip=True,  # randomly flip images horizontally
-                vertical_flip=True  # randomly flip images vertically
-            )
-            datagen.fit(trainX)
+        model = self.get_model()
 
-            model = self.get_model()
+        epochs = 50
+        print("Train shape {} Test shape {}".format(trainY.shape, trainX.shape))
+        batch_size = 4
+        steps_per_epo = len(trainX) / batch_size
+        print("Epoch {} Batch size {} Steps per epoch {}".format(epochs, batch_size, steps_per_epo))
 
-            epochs = 50
-            print("Train shape {} Test shape {}".format(trainY.shape, trainX.shape))
-            batch_size = 4
-            steps_per_epo = len(trainX) / batch_size
-            print("Epoch {} Batch size {} Steps per epoch {}".format(epochs, batch_size, steps_per_epo))
+        # from tf.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, CSVLogger
+        from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
-            # from tf.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, CSVLogger
-            from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+        # learning rate reduction
+        learning_rate_reduction = ReduceLROnPlateau(monitor='val_accuracy',
+                                                    patience=3,
+                                                    verbose=1,
+                                                    factor=0.4,
+                                                    min_lr=0.00001)
 
-            # learning rate reduction
-            learning_rate_reduction = ReduceLROnPlateau(monitor='val_accuracy',
-                                                        patience=3,
-                                                        verbose=1,
-                                                        factor=0.4,
-                                                        min_lr=0.00001)
+        # checkpoints
+        self.create_dir_if_not('output')
+        filepath = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-acc{accuracy:.2f}.hdf5"
+        filepath2 = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-val{val_accuracy:.2f}.hdf5"
 
-            # checkpoints
-            self.create_dir_if_not('output')
-            filepath = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-acc{accuracy:.2f}.hdf5"
-            filepath2 = "output/weights_best_fold-" + str(k_fold_count) + "_{epoch:02d}-val{val_accuracy:.2f}.hdf5"
-
-            checkpoint = ModelCheckpoint(filepath, monitor='accuracy',
+        checkpoint = ModelCheckpoint(filepath, monitor='accuracy',
+                                     verbose=1, save_best_only=True, mode='max')
+        filepath = "output/weights.last_auto4.hdf5"
+        checkpoint_all = ModelCheckpoint(filepath2, monitor='val_accuracy',
                                          verbose=1, save_best_only=True, mode='max')
-            filepath = "output/weights.last_auto4.hdf5"
-            checkpoint_all = ModelCheckpoint(filepath2, monitor='val_accuracy',
-                                             verbose=1, save_best_only=True, mode='max')
 
-            # all callbacks
-            callbacks_list = [checkpoint, learning_rate_reduction, checkpoint_all]
+        # all callbacks
+        callbacks_list = [learning_rate_reduction, checkpoint_all]
 
-            model.fit(datagen.flow(trainX, trainY, batch_size=batch_size), steps_per_epoch=steps_per_epo,
-                      epochs=epochs, validation_data=(testX, testY), callbacks=callbacks_list)
-            tf.keras.backend.clear_session()
-            break
+        model.fit(datagen.flow(trainX, trainY, batch_size=batch_size), steps_per_epoch=steps_per_epo,
+                  epochs=epochs, validation_data=(testX, testY), callbacks=callbacks_list)
+        tf.keras.backend.clear_session()
+
 
     def test(self, best_model_path):
         X, ids = self.pre_pro.load_test_data()
@@ -141,5 +144,5 @@ if __name__ == "__main__":
     if not TEST:
         obj.main()
     else:
-        best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output/weights_best_fold-1_46-acc0.95.hdf5"
+        best_model_path = "/home/dulanj/Projects/Kaggle/Plant-Seed/Plant-Seeding-Classification/src/output/weights_best_fold-0_45-val0.75.hdf5"
         obj.test(best_model_path)

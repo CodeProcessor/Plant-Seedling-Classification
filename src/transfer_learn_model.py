@@ -14,7 +14,7 @@ class TransferLearnModel(Model):
 
     @staticmethod
     def get_model(verbose):
-        model = tf.keras.applications.ResNet50(include_top=False, weights='imagenet', input_shape=(120, 120, 3))
+        model = tf.keras.applications.ResNet50(include_top=False, weights='imagenet', input_shape=(80, 80, 3))
         input_layer = model.inputs
         x = model.layers[-1].output
         x = tf.keras.layers.GlobalAveragePooling2D()(x)
