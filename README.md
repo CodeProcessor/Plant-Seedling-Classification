@@ -1,4 +1,4 @@
-# Plant-Seeding-Classification
+# Plant-Seedling-Classification
 
 ```buildoutcfg
 665/665 [==============================] - 39s 59ms/step - loss: 2.2070 - accuracy: 0.3176
